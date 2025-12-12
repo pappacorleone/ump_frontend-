@@ -1,6 +1,7 @@
 export interface User {
   id: string
   name: string
+  email: string
   initials: string
 }
 
@@ -47,12 +48,14 @@ export interface SessionState {
   id: string
   subject: string
   counterparty: string
-  status: 'waiting' | 'connected' | 'active' | 'ended'
+  counterpartyId?: string | null
+  isCreator?: boolean
+  status: 'waiting' | 'pending' | 'connected' | 'active' | 'ended'
   startTime?: Date
   endTime?: Date
   talkBalance: TalkBalance
   transcript: TranscriptMessage[]
   decisions: string[]
   commitments: Commitment[]
+  dailyRoomUrl?: string
 }
-

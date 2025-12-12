@@ -14,6 +14,8 @@ export default function CaseCard({ caseData }: CaseCardProps) {
       navigate(`/session/${caseData.id}/log`)
     } else if (caseData.status === 'active') {
       navigate(`/session/${caseData.id}/live`)
+    } else if (caseData.status === 'pending') {
+      navigate(`/session/${caseData.id}/lobby`)
     }
   }
 

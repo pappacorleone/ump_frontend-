@@ -3,19 +3,27 @@ import { useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { Button, Input, TextArea } from '../components/ui'
 import { useSession } from '../context/SessionContext'
-import { generateSessionId } from '../data/mockCases'
 
 export default function CaseConfig() {
   const navigate = useNavigate()
-  const { createSession } = useSession()
+  const { createSession, isLoading } = useSession()
   const [counterparty, setCounterparty] = useState('')
   const [subject, setSubject] = useState('')
+  const [error, setError] = useState('')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const sessionId = generateSessionId()
-    createSession(sessionId, subject || 'General Dispute', counterparty || 'Counterparty')
-    navigate(`/session/${sessionId}/lobby`)
+    setError('')
+
+    try {
+      const sessionId = await createSession(
+        subject || 'General Dispute',
+        counterparty || 'Counterparty'
+      )
+      navigate(`/session/${sessionId}/lobby`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create session')
+    }
   }
 
   const isValid = counterparty.trim().length > 0 || subject.trim().length > 0
@@ -37,6 +45,12 @@ export default function CaseConfig() {
       {/* Form */}
       <form onSubmit={handleSubmit}>
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Case Parameters</h1>
+
+        {error && (
+          <div className="bg-red-50 text-red-600 text-sm p-3 rounded-sm border border-red-200 mb-6">
+            {error}
+          </div>
+        )}
 
         <div className="space-y-6">
           <Input
@@ -61,13 +75,12 @@ export default function CaseConfig() {
           <Button
             type="submit"
             className="w-full"
-            disabled={!isValid}
+            disabled={!isValid || isLoading}
           >
-            Initialize Session
+            {isLoading ? 'Creating Session...' : 'Initialize Session'}
           </Button>
         </div>
       </form>
     </div>
   )
 }
-
