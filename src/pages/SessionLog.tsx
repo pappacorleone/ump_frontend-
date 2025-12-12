@@ -3,19 +3,27 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Check, List } from 'lucide-react'
 import { Button, Card } from '../components/ui'
 import { useSession } from '../context/SessionContext'
-import { mockCases } from '../data/mockCases'
+import { api } from '../services/api'
 import type { Case } from '../types'
 
 export default function SessionLog() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { session, clearSession } = useSession()
+  const { session, loadSession, clearSession, isLoading } = useSession()
   const [caseData, setCaseData] = useState<Case | null>(null)
 
-  // Try to get from session context first, then fall back to mock data
+  // Load session if not in context
   useEffect(() => {
-    if (session && session.status === 'ended') {
-      // Create case data from session
+    if (id && (!session || session.id !== id)) {
+      loadSession(id).catch((err) => {
+        console.error('Failed to load session:', err)
+      })
+    }
+  }, [id, session, loadSession])
+
+  // Build case data from session
+  useEffect(() => {
+    if (session) {
       const endTime = session.endTime || new Date()
       const startTime = session.startTime || new Date()
       const durationMs = endTime.getTime() - startTime.getTime()
@@ -26,27 +34,46 @@ export default function SessionLog() {
         id: session.id,
         subject: session.subject,
         counterparty: session.counterparty,
-        status: 'resolved',
+        status: session.status === 'ended' ? 'resolved' : 'active',
         createdAt: startTime.toISOString().split('T')[0],
         duration: `${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`,
         decisions: session.decisions,
         commitments: session.commitments,
       })
-    } else {
-      // Fall back to mock data for direct navigation
-      const mockCase = mockCases.find(c => c.id === id)
-      if (mockCase) {
-        setCaseData(mockCase)
-      }
+    } else if (id && !isLoading) {
+      // Try to load outcomes directly from API
+      Promise.all([
+        api.getSession(id),
+        api.getOutcomes(id),
+      ]).then(([{ session: apiSession }, { decisions, commitments }]) => {
+        const endTime = apiSession.ended_at ? new Date(apiSession.ended_at) : new Date()
+        const startTime = apiSession.started_at ? new Date(apiSession.started_at) : new Date()
+        const durationMs = endTime.getTime() - startTime.getTime()
+        const minutes = Math.floor(durationMs / 60000)
+        const seconds = Math.floor((durationMs % 60000) / 1000)
+
+        setCaseData({
+          id: apiSession.id,
+          subject: apiSession.subject,
+          counterparty: apiSession.counterparty_user_name || apiSession.counterparty_name,
+          status: 'resolved',
+          createdAt: startTime.toISOString().split('T')[0],
+          duration: `${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`,
+          decisions: decisions.map(d => d.content),
+          commitments: commitments.map(c => ({ owner: c.owner_name, text: c.content })),
+        })
+      }).catch((err) => {
+        console.error('Failed to load session outcomes:', err)
+      })
     }
-  }, [session, id])
+  }, [session, id, isLoading])
 
   const handleCloseCase = () => {
     clearSession()
     navigate('/')
   }
 
-  if (!caseData) {
+  if (isLoading || !caseData) {
     return (
       <div className="max-w-2xl mx-auto px-6 py-12 text-center">
         <p className="text-gray-500">Loading session data...</p>
@@ -59,6 +86,7 @@ export default function SessionLog() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Session Log</h1>
+        <p className="text-gray-600 mb-4">{caseData.subject}</p>
         <div className="flex items-center gap-6 text-sm text-gray-500 uppercase tracking-wider">
           <span>Duration: <span className="text-gray-700">{caseData.duration}</span></span>
           <span>Outcome: <span className="text-green-accent font-medium">Decision Locked</span></span>
@@ -110,4 +138,3 @@ export default function SessionLog() {
     </div>
   )
 }
-

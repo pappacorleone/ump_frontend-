@@ -6,30 +6,52 @@ import {
   TranscriptMessage,
   VoiceButton,
   SessionHeader,
+  ElevenLabsAgent,
 } from '../components/session'
 import { useSession } from '../context/SessionContext'
+import { useUser } from '../context/UserContext'
 import { useElapsedTime, useVoiceSession } from '../hooks'
 import { protocolRules } from '../data/protocolRules'
-import { initialSystemMessage, mockScriptedResponses, getCounterpartyResponse } from '../data/mockTranscripts'
+import { initialSystemMessage, mockScriptedResponses } from '../data/mockTranscripts'
 import type { TranscriptMessage as TranscriptMessageType } from '../types'
 
 export default function LiveSession() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { session, addMessage, updateTalkBalance, endSession, addDecision, addCommitment } = useSession()
+  const { user } = useUser()
+  const { 
+    session, 
+    loadSession, 
+    addMessage, 
+    sendMessage,
+    updateTalkBalance, 
+    endSession, 
+    addDecision, 
+    addCommitment,
+    isLoading 
+  } = useSession()
   const [inputValue, setInputValue] = useState('')
   const [activeRule, setActiveRule] = useState<number | undefined>()
   const { isRecording, simulateVoice } = useVoiceSession()
-  const [responseIndex, setResponseIndex] = useState(0)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const elapsedTime = useElapsedTime(session?.startTime)
+
+  // Load session if not already loaded
+  useEffect(() => {
+    if (id && (!session || session.id !== id)) {
+      loadSession(id).catch((err) => {
+        console.error('Failed to load session:', err)
+        navigate('/')
+      })
+    }
+  }, [id, session, loadSession, navigate])
 
   // Initialize session with system message
   useEffect(() => {
     if (session && session.transcript.length === 0) {
       addMessage(initialSystemMessage(session.subject))
     }
-  }, [session, addMessage])
+  }, [session?.id, session?.transcript.length, session?.subject, addMessage])
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -38,31 +60,25 @@ export default function LiveSession() {
     }
   }, [session?.transcript])
 
-  // Redirect if no session
-  useEffect(() => {
-    if (!session) {
-      navigate('/')
-    }
-  }, [session, navigate])
+  if (isLoading || !session) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-64px)]">
+        <div className="text-gray-500">Loading session...</div>
+      </div>
+    )
+  }
 
-  if (!session) return null
-
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputValue.trim()) return
 
-    const userMessage: TranscriptMessageType = {
-      id: `user-${Date.now()}`,
-      type: 'user',
-      content: inputValue,
-      timestamp: new Date(),
-    }
-    addMessage(userMessage)
+    // Send message (this will add it locally and sync via WebSocket)
+    await sendMessage(inputValue)
 
-    // Check for triggers
+    // Check for protocol violations (AI mediator logic)
     const trigger = mockScriptedResponses.find(r => r.trigger.test(inputValue))
     if (trigger) {
       setTimeout(() => {
-        const interventionMessage = {
+        const interventionMessage: TranscriptMessageType = {
           ...trigger.response,
           id: `sys-${Date.now()}`,
           timestamp: new Date(),
@@ -73,40 +89,31 @@ export default function LiveSession() {
       }, 800)
     }
 
-    // Simulate counterparty response
-    setTimeout(() => {
-      const counterpartyMessage: TranscriptMessageType = {
-        id: `counter-${Date.now()}`,
-        type: 'counterparty',
-        speaker: session.counterparty,
-        content: getCounterpartyResponse(responseIndex),
-        timestamp: new Date(),
-      }
-      addMessage(counterpartyMessage)
-      setResponseIndex(prev => prev + 1)
-      
-      // Update talk balance slightly
-      const newUserPercent = Math.max(35, Math.min(65, session.talkBalance.user + (Math.random() - 0.5) * 10))
-      updateTalkBalance(Math.round(newUserPercent), Math.round(100 - newUserPercent))
-    }, 1500)
+    // Update talk balance slightly
+    const newUserPercent = Math.max(35, Math.min(65, session.talkBalance.user + (Math.random() - 0.5) * 10))
+    updateTalkBalance(Math.round(newUserPercent), Math.round(100 - newUserPercent))
 
     setInputValue('')
   }
 
   const handleVoiceToggle = () => {
-    // Use the voice session hook to simulate voice input
     simulateVoice((text) => {
       setInputValue(text)
     })
   }
 
-  const handleEndSession = () => {
+  const handleEndSession = async () => {
     // Add mock decisions and commitments
-    addDecision('Prioritize Enterprise SSO in Q3')
-    addDecision('Acknowledge $100k immediate revenue impact')
-    addCommitment({ owner: 'User', text: 'Send SOW to Enterprise clients by Friday.' })
-    addCommitment({ owner: session.counterparty, text: 'Update Sprint Board to reflect SSO priority.' })
-    endSession()
+    await addDecision('Prioritize Enterprise SSO in Q3')
+    await addDecision('Acknowledge $100k immediate revenue impact')
+    
+    if (user) {
+      await addCommitment({ owner: user.name, text: 'Send SOW to Enterprise clients by Friday.' })
+    }
+    await addCommitment({ owner: session.counterparty, text: 'Update Sprint Board to reflect SSO priority.' })
+    
+    await endSession()
+    navigate(`/session/${id}/log`)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -163,13 +170,14 @@ export default function LiveSession() {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="I feel like..."
+                placeholder="Type your message..."
                 className="flex-1 px-4 py-3 border border-gray-200 rounded-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400"
               />
               <VoiceButton
                 isRecording={isRecording}
                 onToggle={handleVoiceToggle}
               />
+              <ElevenLabsAgent onMessage={addMessage} />
             </div>
           </div>
         </div>
@@ -177,4 +185,3 @@ export default function LiveSession() {
     </div>
   )
 }
-

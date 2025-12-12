@@ -3,24 +3,46 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Link as LinkIcon, Copy, Check } from 'lucide-react'
 import { Button } from '../components/ui'
 import { useSession } from '../context/SessionContext'
+import { socketService } from '../services/api'
 
 export default function SessionLobby() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { session, updateStatus } = useSession()
+  const { session, loadSession, updateStatus, isLoading } = useSession()
   const [copied, setCopied] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
 
-  const sessionUrl = `ump.ai/live/${id}`
-
-  // Simulate connection after a delay
+  // Load session if not already loaded
   useEffect(() => {
-    const timer = setTimeout(() => {
+    if (id && (!session || session.id !== id)) {
+      loadSession(id).catch((err) => {
+        console.error('Failed to load session:', err)
+        navigate('/')
+      })
+    }
+  }, [id, session, loadSession, navigate])
+
+  // Check if counterparty has connected
+  useEffect(() => {
+    if (session?.status === 'connected' || session?.counterpartyId) {
       setIsConnected(true)
-      updateStatus('connected')
-    }, 3000)
-    return () => clearTimeout(timer)
-  }, [updateStatus])
+    }
+  }, [session?.status, session?.counterpartyId])
+
+  // Listen for counterparty joining via WebSocket
+  useEffect(() => {
+    if (!session) return
+
+    const unsub = socketService.onCounterpartyJoined(() => {
+      setIsConnected(true)
+    })
+
+    return () => {
+      unsub?.()
+    }
+  }, [session])
+
+  const sessionUrl = `${window.location.origin}/join/${id}`
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(sessionUrl)
@@ -28,17 +50,24 @@ export default function SessionLobby() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleEnterSession = () => {
-    updateStatus('active')
-    navigate(`/session/${id}/live`)
+  const handleEnterSession = async () => {
+    try {
+      await updateStatus('active')
+      navigate(`/session/${id}/live`)
+    } catch (err) {
+      console.error('Failed to start session:', err)
+    }
   }
 
-  const handleForceConnect = () => {
-    setIsConnected(true)
-    updateStatus('connected')
+  if (isLoading || !session) {
+    return (
+      <div className="max-w-2xl mx-auto px-6 py-8">
+        <div className="text-center text-gray-500">Loading...</div>
+      </div>
+    )
   }
 
-  const counterpartyName = session?.counterparty || 'Counterparty'
+  const counterpartyName = session.counterparty || 'Counterparty'
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-8">
@@ -51,7 +80,7 @@ export default function SessionLobby() {
           <ArrowLeft className="w-4 h-4" />
           <span className="text-sm uppercase tracking-wider">Cancel</span>
         </Link>
-        <span className="text-xs uppercase tracking-widest text-gray-400">Case Configuration</span>
+        <span className="text-xs uppercase tracking-widest text-gray-400">Session Lobby</span>
       </div>
 
       {/* Main content */}
@@ -62,16 +91,29 @@ export default function SessionLobby() {
         </div>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Session Ready</h1>
-        <p className="text-gray-500 mb-10">
-          Waiting for <span className="font-semibold text-gray-700">{counterpartyName}</span> to connect.
+        <p className="text-gray-500 mb-4">
+          {isConnected ? (
+            <>
+              <span className="font-semibold text-gray-700">{counterpartyName}</span> has connected.
+            </>
+          ) : (
+            <>
+              Waiting for <span className="font-semibold text-gray-700">{counterpartyName}</span> to connect.
+            </>
+          )}
         </p>
+
+        {/* Session subject */}
+        <div className="text-sm text-gray-400 mb-8">
+          Subject: <span className="text-gray-600">{session.subject}</span>
+        </div>
 
         {/* Shareable link */}
         <div className="border border-gray-200 rounded-sm p-4 flex items-center justify-between mb-6">
-          <span className="text-gray-600 font-mono text-sm">{sessionUrl}</span>
+          <span className="text-gray-600 font-mono text-sm truncate flex-1 text-left">{sessionUrl}</span>
           <button
             onClick={handleCopy}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-600 transition-colors ml-4"
           >
             {copied ? <Check className="w-5 h-5 text-green-accent" /> : <Copy className="w-5 h-5" />}
           </button>
@@ -96,17 +138,12 @@ export default function SessionLobby() {
           Enter Session
         </Button>
 
-        {/* Dev force connect */}
         {!isConnected && (
-          <button
-            onClick={handleForceConnect}
-            className="mt-6 text-xs text-gray-400 hover:text-gray-500 transition-colors"
-          >
-            [DEV: FORCE CONNECT]
-          </button>
+          <p className="text-xs text-gray-400 mt-6">
+            Share the link above with your counterparty. The session will start once they connect.
+          </p>
         )}
       </div>
     </div>
   )
 }
-
