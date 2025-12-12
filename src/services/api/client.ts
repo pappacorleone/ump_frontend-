@@ -37,48 +37,17 @@ class ApiClient {
       headers['Content-Type'] = 'application/json'
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/a9316242-7b3b-4110-84f0-712b285e9d22',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:40',message:'API request starting',data:{endpoint,method,apiUrl:API_URL,hasBody:!!body},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    })
 
-    let response: Response;
-    try {
-      response = await fetch(`${API_URL}${endpoint}`, {
-        method,
-        headers,
-        body: body ? JSON.stringify(body) : undefined,
-      })
-    } catch (fetchError) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/a9316242-7b3b-4110-84f0-712b285e9d22',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:50',message:'Fetch network error',data:{endpoint,error:String(fetchError)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
-      throw fetchError;
-    }
-
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/a9316242-7b3b-4110-84f0-712b285e9d22',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:56',message:'Fetch response received',data:{endpoint,status:response.status,ok:response.ok,statusText:response.statusText},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,E'})}).catch(()=>{});
-    // #endregion
-
-    let data: unknown;
-    try {
-      data = await response.json()
-    } catch (jsonError) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/a9316242-7b3b-4110-84f0-712b285e9d22',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:65',message:'JSON parse error',data:{endpoint,error:String(jsonError)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
-      throw jsonError;
-    }
+    const data = await response.json()
 
     if (!response.ok) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/a9316242-7b3b-4110-84f0-712b285e9d22',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:73',message:'API error response',data:{endpoint,status:response.status,data},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
-      // #endregion
       throw new Error((data as {error?: string}).error || 'Request failed')
     }
-
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/a9316242-7b3b-4110-84f0-712b285e9d22',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:80',message:'API request success',data:{endpoint},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'success'})}).catch(()=>{});
-    // #endregion
 
     return data as T
   }
@@ -121,6 +90,9 @@ class ApiClient {
   }
 
   async joinSession(id: string) {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/a9316242-7b3b-4110-84f0-712b285e9d22',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:joinSession',message:'API joinSession called',data:{sessionId:id,token:this.getToken()?.substring(0,20)+'...',endpoint:`/api/sessions/${id}/join`},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B,E'})}).catch(()=>{});
+    // #endregion
     return this.request<{ success: boolean }>(
       `/api/sessions/${id}/join`,
       { method: 'POST' }

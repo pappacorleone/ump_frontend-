@@ -20,8 +20,15 @@ export default function JoinSession() {
   useEffect(() => {
     if (!id) return
 
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/a9316242-7b3b-4110-84f0-712b285e9d22',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JoinSession.tsx:useEffect',message:'Fetching session details',data:{sessionId:id,userId:user?.id,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,E'})}).catch(()=>{});
+    // #endregion
+
     api.getSession(id)
       .then(({ session: sessionData }) => {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/a9316242-7b3b-4110-84f0-712b285e9d22',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JoinSession.tsx:useEffect',message:'Session fetched successfully',data:{sessionId:id,sessionDbId:sessionData.id,creatorId:sessionData.creator_id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         setSession(sessionData)
         // Check if already joined
         if (user && sessionData.counterparty_id === user.id) {
@@ -49,12 +56,22 @@ export default function JoinSession() {
     setIsJoining(true)
     setError('')
 
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/a9316242-7b3b-4110-84f0-712b285e9d22',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JoinSession.tsx:handleJoin',message:'Join attempt starting',data:{sessionId:id,userId:user?.id,hasToken:!!api.getToken()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B'})}).catch(()=>{});
+    // #endregion
+
     try {
       await api.joinSession(id)
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/a9316242-7b3b-4110-84f0-712b285e9d22',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JoinSession.tsx:handleJoin',message:'Join succeeded',data:{sessionId:id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       setHasJoined(true)
       // Join the WebSocket room
       socketService.joinSession(id)
     } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/a9316242-7b3b-4110-84f0-712b285e9d22',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JoinSession.tsx:handleJoin',message:'Join failed',data:{sessionId:id,error:err instanceof Error ? err.message : String(err)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B,C'})}).catch(()=>{});
+      // #endregion
       setError(err instanceof Error ? err.message : 'Failed to join session')
     } finally {
       setIsJoining(false)

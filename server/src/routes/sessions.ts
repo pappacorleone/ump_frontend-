@@ -44,6 +44,11 @@ router.get('/:id', optionalAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params
 
+    // #region agent log
+    const fs = await import('fs');
+    fs.appendFileSync('c:\\Users\\kmond\\ump\\.cursor\\debug.log', JSON.stringify({location:'sessions.ts:getSession',message:'Get session endpoint hit',data:{sessionId:id,hasUser:!!req.user,userId:req.user?.id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,E'})+'\n');
+    // #endregion
+
     const result = await pool.query(
       `SELECT s.*, 
               u1.name as creator_name,
@@ -54,6 +59,10 @@ router.get('/:id', optionalAuth, async (req: AuthRequest, res: Response) => {
        WHERE s.id = $1`,
       [id]
     )
+
+    // #region agent log
+    fs.appendFileSync('c:\\Users\\kmond\\ump\\.cursor\\debug.log', JSON.stringify({location:'sessions.ts:getSession',message:'Get session query result',data:{sessionId:id,found:result.rows.length > 0,rowCount:result.rows.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,C'})+'\n');
+    // #endregion
 
     if (result.rows.length === 0) {
       res.status(404).json({ error: 'Session not found' })
@@ -94,13 +103,25 @@ router.post('/:id/join', authMiddleware, async (req: AuthRequest, res: Response)
     const { id } = req.params
     const userId = req.user!.id
 
+    // #region agent log
+    const fs = await import('fs');
+    fs.appendFileSync('c:\\Users\\kmond\\ump\\.cursor\\debug.log', JSON.stringify({location:'sessions.ts:join',message:'Join endpoint hit',data:{sessionId:id,userId,userEmail:req.user!.email},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B,C'})+'\n');
+    // #endregion
+
     // Get session
     const session = await pool.query(
       'SELECT * FROM sessions WHERE id = $1',
       [id]
     )
 
+    // #region agent log
+    fs.appendFileSync('c:\\Users\\kmond\\ump\\.cursor\\debug.log', JSON.stringify({location:'sessions.ts:join',message:'Session query result',data:{sessionId:id,rowCount:session.rows.length,found:session.rows.length > 0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D'})+'\n');
+    // #endregion
+
     if (session.rows.length === 0) {
+      // #region agent log
+      fs.appendFileSync('c:\\Users\\kmond\\ump\\.cursor\\debug.log', JSON.stringify({location:'sessions.ts:join',message:'Session NOT FOUND - returning 404',data:{sessionId:id,userId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,C,D'})+'\n');
+      // #endregion
       res.status(404).json({ error: 'Session not found' })
       return
     }

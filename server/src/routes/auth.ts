@@ -8,9 +8,6 @@ const router = Router()
 
 // Register new user
 router.post('/register', async (req, res: Response) => {
-  // #region agent log
-  const fs = await import('fs'); fs.appendFileSync('c:\\Users\\kmond\\ump\\.cursor\\debug.log', JSON.stringify({location:'auth.ts:10',message:'Register endpoint hit',data:{body:req.body,origin:req.headers.origin},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,A'})+'\n');
-  // #endregion
   try {
     const { email, password, name } = req.body
 
@@ -19,19 +16,11 @@ router.post('/register', async (req, res: Response) => {
       return
     }
 
-    // #region agent log
-    fs.appendFileSync('c:\\Users\\kmond\\ump\\.cursor\\debug.log', JSON.stringify({location:'auth.ts:21',message:'Checking existing user',data:{email:email.toLowerCase()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})+'\n');
-    // #endregion
-
     // Check if user exists
     const existingUser = await pool.query(
       'SELECT id FROM users WHERE email = $1',
       [email.toLowerCase()]
     )
-
-    // #region agent log
-    fs.appendFileSync('c:\\Users\\kmond\\ump\\.cursor\\debug.log', JSON.stringify({location:'auth.ts:31',message:'DB query completed',data:{existingUserCount:existingUser.rows.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})+'\n');
-    // #endregion
 
     if (existingUser.rows.length > 0) {
       res.status(400).json({ error: 'Email already registered' })
@@ -51,15 +40,8 @@ router.post('/register', async (req, res: Response) => {
     const user = { id: userId, email: email.toLowerCase(), name }
     const token = generateToken(user)
 
-    // #region agent log
-    fs.appendFileSync('c:\\Users\\kmond\\ump\\.cursor\\debug.log', JSON.stringify({location:'auth.ts:53',message:'Register success',data:{userId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'success'})+'\n');
-    // #endregion
-
     res.status(201).json({ user, token })
   } catch (error) {
-    // #region agent log
-    const fs2 = await import('fs'); fs2.appendFileSync('c:\\Users\\kmond\\ump\\.cursor\\debug.log', JSON.stringify({location:'auth.ts:60',message:'Register error',data:{error:String(error)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})+'\n');
-    // #endregion
     console.error('[Auth] Register error:', error)
     res.status(500).json({ error: 'Registration failed' })
   }

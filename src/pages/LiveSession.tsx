@@ -6,6 +6,7 @@ import {
   TranscriptMessage,
   VoiceButton,
   SessionHeader,
+  ElevenLabsAgent,
 } from '../components/session'
 import { useSession } from '../context/SessionContext'
 import { useUser } from '../context/UserContext'
@@ -176,6 +177,7 @@ export default function LiveSession() {
                 isRecording={isRecording}
                 onToggle={handleVoiceToggle}
               />
+              <ElevenLabsAgent onMessage={addMessage} />
             </div>
           </div>
         </div>
