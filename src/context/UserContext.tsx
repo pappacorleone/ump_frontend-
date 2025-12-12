@@ -71,15 +71,25 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const register = useCallback(async (email: string, password: string, name: string) => {
-    const { user: userData, token } = await api.register(email, password, name)
-    api.setToken(token)
-    setUser({
-      id: userData.id,
-      email: userData.email,
-      name: userData.name,
-      initials: getInitials(userData.name),
-    })
-    socketService.connect(token)
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/a9316242-7b3b-4110-84f0-712b285e9d22',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserContext.tsx:73',message:'Register called',data:{email,nameLen:name.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'entry'})}).catch(()=>{});
+    // #endregion
+    try {
+      const { user: userData, token } = await api.register(email, password, name)
+      api.setToken(token)
+      setUser({
+        id: userData.id,
+        email: userData.email,
+        name: userData.name,
+        initials: getInitials(userData.name),
+      })
+      socketService.connect(token)
+    } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/a9316242-7b3b-4110-84f0-712b285e9d22',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserContext.tsx:87',message:'Register error caught',data:{error:String(err)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B,D'})}).catch(()=>{});
+      // #endregion
+      throw err;
+    }
   }, [])
 
   const logout = useCallback(() => {

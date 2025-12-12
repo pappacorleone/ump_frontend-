@@ -16,10 +16,12 @@ dotenv.config()
 const app = express()
 const httpServer = createServer(app)
 
-// CORS configuration
-const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173'
+// CORS configuration - allow multiple local dev ports
+const corsOrigins = process.env.CORS_ORIGIN 
+  ? process.env.CORS_ORIGIN.split(',') 
+  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176']
 app.use(cors({
-  origin: corsOrigin,
+  origin: corsOrigins,
   credentials: true,
 }))
 
@@ -28,7 +30,7 @@ app.use(express.json())
 // Socket.io setup
 const io = new SocketServer(httpServer, {
   cors: {
-    origin: corsOrigin,
+    origin: corsOrigins,
     methods: ['GET', 'POST'],
     credentials: true,
   },
